@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>车间布局规划 · SLP 小游戏</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="topbar">
+    <div class="title">
+      <h1>🏭 车间布局规划 · SLP 小游戏</h1>
+      <div class="subtitle">
+        产品：<b>儿童玩具小汽车</b>（车身线 + 底盘线 → 总装线）·
+        场地 <b>28m × 16m</b>（1 格 = 1m）· 规则：工作台之间至少保留 1m 通道
+      </div>
+    </div>
+    <div class="hud" id="hud"></div>
+  </header>
+
+  <main>
+    <!-- 左：工艺流程图（点击放大） -->
+    <aside id="left">
+      <section class="panel">
+        <h2>📋 产品工艺流程图 <span class="hint">（点击放大查看）</span></h2>
+        <p class="intro">
+          车身「注塑 → 涂装 → 贴标」与底盘「注塑 → 车轮装配 → 底盘总成」汇入总装，
+          再检测、包装入库。箭头上 <b>×N</b> 表示每件成品的物流量，
+          <b>A / I</b> 为 SLP 物流强度等级（A = 绝对重要）。
+        </p>
+        <div id="flowSvg" class="flow-thumb" title="点击放大查看工艺流程图"></div>
+        <div class="legend" id="lineLegend"></div>
+        <div class="legend">
+          <span class="itag it-a">A</span> 绝对重要（物流量 ≥ 4）
+          <span class="itag it-e">E</span> 特别重要（2 ~ 3）
+          <span class="itag it-i">I</span> 重要（1）
+        </div>
+        <div class="note" id="bottleneck"></div>
+      </section>
+    </aside>
+
+    <!-- 中：场地 -->
+    <section id="center">
+      <div class="modebar">
+        <button id="btnPlace" class="btn active">🏗 摆放工作台 <small>(1)</small></button>
+        <button id="btnRoute" class="btn">🛣 规划物流路线 <small>(2)</small></button>
+        <span class="sep"></span>
+        <button id="btnRotate" class="btn" title="快捷键 R">🔄 旋转</button>
+        <button id="btnAutoAll" class="btn">⚡ 全部自动规划</button>
+        <button id="btnClearRoutes" class="btn">🧹 清空路线</button>
+        <button id="btnAnim" class="btn">▶ 运行演示</button>
+        <button id="btnExport" class="btn">💾 导出布局</button>
+        <button id="btnReset" class="btn danger">♻ 重置</button>
+        <span class="sep"></span>
+        <button id="btnDrawer" class="btn panel-btn">📊 评分 / 路线 <small>(3)</small></button>
+      </div>
+      <div id="canvasWrap">
+        <canvas id="floor"></canvas>
+      </div>
+      <div id="hintbar"></div>
+      <section class="panel palette-panel">
+        <h3>📦 待摆放工作台 <span class="hint">点击卡片拾取 → 在场地上点击放下；放置后可拖动调整</span></h3>
+        <div id="paletteCards"></div>
+      </section>
+    </section>
+  </main>
+
+  <!-- 二级面板（抽屉）：评分 / 路线 / 详情 / 建议 / 玩法 -->
+  <aside id="drawer">
+    <div class="drawer-head">
+      <h2>📊 评分与路线</h2>
+      <button id="drawerClose" class="btn ghost" title="关闭面板（快捷键 3）">✕</button>
+    </div>
+    <div class="tabs">
+      <button id="tabScore" class="tab active">📊 评分</button>
+      <button id="tabRoute" class="tab">🔗 路线</button>
+      <button id="tabDetail" class="tab">🔍 详情</button>
+      <button id="tabAdvice" class="tab">💡 建议</button>
+      <button id="tabHelp" class="tab">🎮 玩法</button>
+    </div>
+    <div class="drawer-body">
+      <section class="pane open" id="paneScore">
+        <div class="score-grid">
+          <div class="score-item"><div class="num" id="scPlanned">0/0</div><div class="lbl">路线完成</div></div>
+          <div class="score-item"><div class="num big" id="scTimeEff">0%</div><div class="lbl">搬运效率</div></div>
+          <div class="score-item"><div class="num" id="scTime">—</div><div class="lbl">实际搬运时长</div></div>
+          <div class="score-item"><div class="num" id="scTimeBound">—</div><div class="lbl">最短搬运时长</div></div>
+          <div class="score-item"><div class="num" id="scActual">—</div><div class="lbl">实际物流量</div></div>
+          <div class="score-item"><div class="num" id="scEff">0%</div><div class="lbl">物流效率</div></div>
+        </div>
+        <div class="handlers" id="scHandlers"></div>
+        <p class="foot" id="scFoot"></p>
+      </section>
+      <section class="pane" id="paneRoute">
+        <p class="hint" style="margin:0 0 8px">点击行开始规划；也可以直接在地面点击该路线的起点工作台。</p>
+        <div id="linkList"></div>
+      </section>
+      <section class="pane" id="paneDetail">
+        <div id="stationDetail"></div>
+      </section>
+      <section class="pane" id="paneAdvice">
+        <ul id="adviceList"></ul>
+      </section>
+      <section class="pane" id="paneHelp">
+        <ol class="help">
+          <li><b>摆放</b>：点击下方工作台卡片拾取，再点击场地放下；拖动可移动，<kbd>R</kbd> 或右键旋转，<kbd>Del</kbd> 删除。</li>
+          <li><b>限制</b>：工作台不可重叠、不可出界，相互之间至少留 1 格通道。</li>
+          <li><b>路线</b>：切换到路线模式，在「🔗 路线」面板选择一条路线 → 点击起点工作台 → 逐格点击画路径（只能横 / 竖走，不能穿过工作台）→ 点击终点工作台完成。</li>
+          <li><b>评分</b>：路线距离会换算成搬运时长（装卸 + 往返距离 ÷ 搬运速度），物流量越大的路线影响越大；搬运时长越短、需要的搬运工越少，布局越好。</li>
+          <li><b>流程图</b>：点击左侧流程图可放大；在大图中点击节点可直接定位 / 拾取对应工作台。</li>
+          <li><b>面板</b>：评分、路线、详情、建议都收在右侧「📊 评分 / 路线」面板里，快捷键 <kbd>3</kbd> 可打开 / 关闭。</li>
+          <li><b>演示</b>：点击「运行演示」观看物料沿路线流动。</li>
+        </ol>
+      </section>
+    </div>
+  </aside>
+
+  <!-- 工艺流程放大图 -->
+  <div id="diagramModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h2>📋 产品工艺流程图（放大）</h2>
+        <button id="modalClose" class="btn ghost">✕ 关闭</button>
+      </div>
+      <div id="modalFlow" class="modal-flow"></div>
+      <p class="hint">在大图中点击任意节点：已放置的工作台会在场地中被定位（金色框），未放置的会进入拾取状态。</p>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
